@@ -18,14 +18,47 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
+/**
+ * Clase de pruebas unitarias para UsuarioService.
+ * <p>
+ * Esta clase contiene pruebas exhaustivas para verificar el comportamiento
+ * de la lógica de negocio implementada en UsuarioService, utilizando
+ * mocks para aislar las dependencias.
+ * </p>
+ * 
+ * <p>
+ * Las pruebas cubren:
+ * - Casos de éxito para todas las operaciones CRUD
+ * - Validaciones de datos de entrada
+ * - Manejo de errores y excepciones
+ * - Reglas de negocio específicas
+ * </p>
+ * 
+ * @author Roberto Rivas
+ * @version 1.0.0
+ * @since 2025-07-14
+ */
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceTest {
 
+    /**
+     * Mock del DAO para aislar las pruebas del servicio.
+     */
     @Mock
     private UsuarioDAO usuarioDAO;
     
+    /**
+     * Instancia del servicio bajo prueba.
+     */
     private UsuarioService usuarioService;
     
+    /**
+     * Configuración inicial para cada prueba.
+     * <p>
+     * Se ejecuta antes de cada método de prueba para inicializar
+     * el estado necesario.
+     * </p>
+     */
     @BeforeEach
     void setUp() {
         usuarioService = new UsuarioServiceImpl(usuarioDAO);
@@ -244,4 +277,56 @@ class UsuarioServiceTest {
         verify(usuarioDAO).buscarPorId(userId);
         verify(usuarioDAO, never()).eliminar(anyLong());
     }
+
+    @Test
+void deberiaActualizarUsuarioExistente() {
+    // Given
+    Usuario usuarioExistente = new Usuario(1L, "Original", "original@email.com");
+    Usuario usuarioActualizado = new Usuario(1L, "Actualizado", "actualizado@test.com");
+    
+    when(usuarioDAO.buscarPorId(1L)).thenReturn(Optional.of(usuarioExistente));
+    when(usuarioDAO.buscarTodos()).thenReturn(Arrays.asList(usuarioExistente));
+    when(usuarioDAO.actualizar(any(Usuario.class))).thenReturn(usuarioActualizado);
+    
+    // When
+    Usuario resultado = usuarioService.actualizarUsuario(usuarioActualizado);
+    
+    // Then
+    assertEquals("Actualizado", resultado.getNombre());
+    assertEquals("actualizado@test.com", resultado.getEmail());
+    verify(usuarioDAO).buscarPorId(1L);
+    verify(usuarioDAO).buscarTodos();
+    verify(usuarioDAO).actualizar(usuarioActualizado);
+}
+
+@Test
+void deberiaLanzarExcepcionAlActualizarSinId() {
+    // Given
+    Usuario usuario = new Usuario("Sin ID", "sin.id@email.com");
+    
+    // When & Then
+    UsuarioException exception = assertThrows(UsuarioException.class,
+        () -> usuarioService.actualizarUsuario(usuario));
+    
+    assertEquals("El ID del usuario es obligatorio para actualizar", exception.getMessage());
+    verify(usuarioDAO, never()).actualizar(any());
+}
+
+@Test
+void deberiaLanzarExcepcionAlActualizarConEmailDuplicado() {
+    // Given
+    Usuario usuarioExistente = new Usuario(1L, "Original", "original@email.com");
+    Usuario otroUsuario = new Usuario(2L, "Otro", "duplicado@email.com");
+    Usuario usuarioParaActualizar = new Usuario(1L, "Actualizado", "duplicado@email.com");
+    
+    when(usuarioDAO.buscarPorId(1L)).thenReturn(Optional.of(usuarioExistente));
+    when(usuarioDAO.buscarTodos()).thenReturn(Arrays.asList(usuarioExistente, otroUsuario));
+    
+    // When & Then
+    UsuarioException exception = assertThrows(UsuarioException.class,
+        () -> usuarioService.actualizarUsuario(usuarioParaActualizar));
+    
+    assertEquals("Ya existe un usuario con este email", exception.getMessage());
+    verify(usuarioDAO, never()).actualizar(any());
+}
 }
